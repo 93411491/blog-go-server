@@ -11,13 +11,14 @@ import (
 func main() {
 	config.LoadConfig()
 	database.Init()
-	
+
 	r := gin.Default()
 	apiV1 := r.Group("/api/v1")
 	{
 		auth := apiV1.Group("/auth")
 		{
 			auth.POST("/register", v1.Register)
+			auth.POST("/login",v1.Login)
 		}
 	}
 

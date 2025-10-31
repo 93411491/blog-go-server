@@ -2,6 +2,7 @@ package v1
 
 import (
 	"blog-go/internal/model"
+	"blog-go/pkg/auth"
 	"blog-go/pkg/database"
 	"blog-go/utils"
 	"net/http"
@@ -48,12 +49,52 @@ func Register(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":  "注册成功",
-		"user": gin.H {
-			"id": newUser.ID,
-			"username":newUser.Username,
-			"email":newUser.Email,
+		"message": "注册成功",
+		"user": gin.H{
+			"id":       newUser.ID,
+			"username": newUser.Username,
+			"email":    newUser.Email,
 		},
+	})
+
+}
+
+type LoginRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+func Login(c *gin.Context) {
+	var req LoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "参数无效：" + err.Error(),
+		})
+		return
+	}
+	var user model.User
+	if err := database.DB.Where("username = ?", req.Username).First(&user).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "用户名或密码错误"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "数据库查询失败"})
+		return
+	}
+
+	if !utils.CheckPasswordHash(req.Password, user.Password) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "用户名或密码错误"})
+		return
+	}
+
+	token, err := auth.GenerateToken(user.ID, user.Username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成token失败"})
+		return
+	}
+	c.JSON(http.StatusOK,gin.H{
+		"message": "登录成功",
+		"token":   token,
 	})
 
 }
